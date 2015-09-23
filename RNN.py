@@ -13,7 +13,10 @@ import theano.tensor as T
 import numpy as np 
 from character_mapping import Character_Map
 import time
-
+try:
+	import cPickle as pickle
+except:
+	import pickle
 
 class RNN(object):
 
@@ -49,19 +52,19 @@ class RNN(object):
 		
 		self.bh = theano.shared(name='bh',
 								value=np.zeros(nh,
-								dtype=theano.config.floatX))
+								dtype=theano.config.floatX)) #hidden layer bias
 		
 		self.by = theano.shared(name='b',
 							   value=np.zeros(ny,
-							   dtype=theano.config.floatX))
+							   dtype=theano.config.floatX)) #output layer bias
 		
 		self.h0 = theano.shared(name='h0',
 								value=np.zeros(nh,
 								dtype=theano.config.floatX)) #initial h vector 
 
-		self.sequence_length = 50
+		self.sequence_length = 15
 
-	def feed_through_theano(self,x,h_tm1):
+	def feed_through(self,x,h_tm1):
 		"""
 		t_step is the current time step. If t_step == 0, then we use self.h0
 		to feed through net.
@@ -73,19 +76,8 @@ class RNN(object):
 
 		y_guess = T.nnet.softmax(y_hat) 
 
-		return [y_hat,y_guess]
-
-	def feed_through_dean(self,x,h_tm1):
-
-		h = T.tanh(T.dot(x,self.wx) + T.dot(h_tm1, self.wh) + self.bh)
-
-		y_hat = self.by + T.dot(h,self.wy)
-
-		y_guess = T.nnet.softmax(y_hat) 
-
-		return [y_guess,h]
-
-
+		return h, y_guess
+	
 	def loss(self,x,y):
 		"""
 		args:
@@ -96,27 +88,35 @@ class RNN(object):
 		"""
 		# y = y[-1]
 
-		y_intermediate, h = self.feed_through_dean(x,self.h0)
-		y_total = y_intermediate
-		for i in xrange(1,self.sequence_length):
-			y_intermediate,h = self.feed_through_dean(y_intermediate,h)
-			y_total += y_intermediate
+		# y_intermediate, h = self.feed_through_dean(x,self.h0)
+		# y_total = y_intermediate
+		# for i in xrange(1,self.sequence_length):
+		# 	y_intermediate, h = self.feed_through_dean(y_intermediate,h)
+		# 	y_total += y_intermediate
 
+		[h, s], _ = theano.scan(fn=self.feed_through,
+						sequences=x,
+						outputs_info=[self.h0,None])
+						# n_steps=self.sequence_length)
+		
+		# return -T.mean(T.log(p_y_given_x_sentence)[T.arange(y.shape[0]), y])
+		return -T.mean(T.log(s)[T.arange(y.shape[0]), y])
 
-		# [h, s], _ = theano.scan(fn=self.feed_through_theano,
-		# 				sequences=x[0],
-		# 				outputs_info=[self.h0,None],
-		# 				n_steps=5)
+	def save_param(self,pickle_file):
 
-		# p_y_given_x_sentence = s[:, 0, :]
-		# print(p_y_given_x_sentence)
-			
-		# y_pred = T.argmax(p_y_given_x_sentence, axis=1)
-		# print(y_pred)
-		# -T.mean(T.log(y_total))
-		# [T.arange(y.shape[0]),y]
+		pickle_me = {
+					'param':[self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
+		}
 
-		return -T.mean(T.log(y_total)[T.arange(y.shape[0]), y])
+		pickle.dump( pickle_me, open(pickle_file, 'wb') )
+
+	def load_param(self,pickle_file):
+
+		pickle_me = pickle.load(open(pickle_file,'rb'))
+
+		param = pickle_me['param']
+
+		self.wx, self.wh, self.wy, self.bh, self.by, self.h0 = param
 
 	def train(self,training_data,learning_rate,n_epochs,mini_batch_size):
 		"""
@@ -125,19 +125,18 @@ class RNN(object):
 		"""
 		# self.char_sequence_length = char_sequence_length
 		train_x, train_y = training_data
-		# print(train_x.get_value(borrow=True)[:10].shape)
-		# print(train_y.get_value(borrow=True)[:10].shape)
 		train_y = T.cast(train_y,'int32')
 		train_size_total = train_x.get_value(borrow=True).shape[0]
+
 		# n_train = len(train_x)
 		# print(train_size_total, n_train)
 		n_train_batches = train_size_total/mini_batch_size
 
-		x = T.dmatrix('x')
-		y = T.ivector('y')
-		index = T.lscalar()
+		x = T.matrix('x')
+		y = T.imatrix('y')
+		index = T.iscalar()
 
-		cost = (self.loss(x,y))
+		cost = self.loss(x,y)
 		params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
 		grads = T.grad(cost,params)
 		updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
@@ -156,12 +155,19 @@ class RNN(object):
 			t1 = time.time()
 			for index in xrange(n_train_batches):
 				train_model(index)
-				print("Minibatch done")
+				# print("Minibatch done")
 			print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
+			if i % 5 == 0:
+				t2 = time.time()
+				self.save_param("param_epoch{}.dat".format(i))
+				print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
 
-		
 
 	def gen_random_sentence(self,x_init):
+		"""
+		Run 'x_init' through the RNN, saving the y values at 
+		each 'time step'.
+		"""
 		ys = []
 		y, h = self.feed_through_dean(x_init,self.h0)
 		ys.append(y)
@@ -170,13 +176,29 @@ class RNN(object):
 			ys.append(y)
 
 		# ys = [y.eval() for y in ys]
-		ys_arg_max = [np.argmax(y) for y in ys]
+		# ys_arg_max = [np.argmax(y) for y in ys]
 
-		return ys, ys_arg_max
+		return ys
+
+
+	def compile_gen_sentence(self):
+		"""
+		compile a theano function that takes the initial x value 
+		and returns y vectors for each of the subsequent positions. 
+		"""
+		x = T.dvector('x')
+		y = self.gen_random_sentence(x)
+
+		f = theano.function([x],y)
+
+		return f 
+
+
 
 if __name__ == '__main__':
+
 	text_test = './../texts/melville.txt'
-	char_map_obj = Character_Map(text_test, 'mapping.dat',overwrite=True)
+	char_map_obj = Character_Map(text_test,'mapping.dat',overwrite=True, break_line=5000)
 	char_map_obj.k_map()
 	x, y, shared_x, shared_y = char_map_obj.gen_x_and_y(filename=None)
 	# print(shared_x, shared_y.get_value().shape[0])
@@ -185,8 +207,10 @@ if __name__ == '__main__':
 	ny = nx 
 
 	trainer = RNN(nh,nx,ny)
+	# trainer.load_param('param_epoch95.dat')
 	trainer.train((shared_x,shared_y),0.0001,100,10)
-	print(trainer.gen_random_sentence(x[0]))
+	f = trainer.compile_gen_sentence()
+
 
 
 

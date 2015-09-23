@@ -89,7 +89,7 @@ class Character_Map(object):
 		self.mapping_matrix = mapping_matrix
 		return mapping_matrix
 
-	def gen_x_and_y(self,borrow=True,filename='x_y.dat',sequence_length=50):
+	def gen_x_and_y(self,borrow=True,filename='x_y.dat',sequence_length=15):
 		"""
 		Generates two lists, each of length N-1, where N is the total number of characters
 		in the input text. This means we miss the last character
@@ -103,12 +103,11 @@ class Character_Map(object):
 			y = self.mapping_matrix[1:] #missing first index
 			length_x = len(x)
 			# print(length_x//sequence_length)
-			x = [sequence[0] for sequence in  [x[i:i+sequence_length] for i in xrange(length_x//sequence_length)]]
-			y = [np.argmax(sequence[-1]) for sequence in [y[i:i+sequence_length] for i in xrange(length_x//sequence_length)]]
+			x = [sequence for sequence in [x[i:i+sequence_length] for i in xrange(length_x//sequence_length)]]
+			y = [sequence for sequence in [y[i:i+sequence_length] for i in xrange(length_x//sequence_length)]]
 			shared_x = theano.shared(np.asarray(x,dtype=theano.config.floatX),borrow=borrow)
 			shared_y = theano.shared(np.asarray(y,dtype=theano.config.floatX),borrow=borrow)
 			return (x, y, shared_x, shared_y)
-
 
 		if filename == None:
 			x,y, shared_x, shared_y = make()
@@ -130,8 +129,8 @@ class Character_Map(object):
 			shared_x = pickled['shared_x']
 			shared_y = pickled['shared_y']
 			print("Time loading in arrays: {:.3f} sec".format(time.time()-t1))
+		
 		return (x, y, shared_x, shared_y)
-
 
 
 def test():
@@ -140,12 +139,12 @@ def test():
 	# print(len(foo.mapping))
 	map_matrix = foo.k_map()
 	x,y,shared_x, shared_y = foo.gen_x_and_y(filename=None)
-	print(shared_x.get_value()[:10])
-	print(shared_y.get_value()[:10])
+	# print(shared_x.get_value()[:10])
+	# print(shared_y.get_value()[:10])
 	# print(shared_y.get_value().shape)
 
 	# print(len(x))
-	# print(shared_x.get_value().shape)
+	print(shared_x.get_value().shape)
 	# print(shared_x.get_value()[0])
 
 if __name__ =='__main__':
