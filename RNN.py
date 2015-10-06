@@ -99,7 +99,7 @@ class RNNClass(object):
 
 		y_guess = s[:,0,:]
 
-		return -T.mean(y*T.log(y_guess) + (1.0-y)*T.log(1-y_guess))
+		return y*T.log(y_guess) + (1.0-y)*T.log(1.0-y_guess)
 
 	def sqr_diff_loss(self, x, y):
 
@@ -128,64 +128,64 @@ class RNNClass(object):
 
 		self.wx, self.wh, self.wy, self.bh, self.by, self.h0 = param
 
-	def train_no_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
-		"""
-		Right now using cross entropy loss function. This works, albeit very slowly.
-		args:
-			- training_data: inputs with ideal outputs
-			- learning_rate
-			- n_epochs: the number of epochs to train the NN for 
-			- mini_batch_size: the size of the mini batch to be used for SGD 
+	# def train_no_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
+	# 	"""
+	# 	Right now using cross entropy loss function. This works, albeit very slowly.
+	# 	args:
+	# 		- training_data: inputs with ideal outputs
+	# 		- learning_rate
+	# 		- n_epochs: the number of epochs to train the NN for 
+	# 		- mini_batch_size: the size of the mini batch to be used for SGD 
 
-		"""
-		train_x, train_y = training_data
-		# cast_y = T.cast(train_y,'int32')
-		train_size_total = train_x.get_value(borrow=True).shape[0]
+	# 	"""
+	# 	train_x, train_y = training_data
+	# 	train_size_total = train_x.get_value(borrow=True).shape[0]
 
-		n_train_batches = train_size_total/mini_batch_size
+	# 	n_train_batches = train_size_total/mini_batch_size
 
-		x = T.matrix('x')
-		y = T.matrix('y')
-		# xs = T.tensor3('xs')
-		# ys = T.itensor3('ys')
+	# 	x = T.matrix('x')
+	# 	y = T.matrix('y')
+	# 	xs = T.tensor3('xs')
+	# 	ys = T.itensor3('ys')
 
-		# index = T.iscalar()
+	# 	# index = T.iscalar()
 
-		cost = self.cross_entropy_loss(x,y)
-		params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
-		grads = T.grad(cost,params)
-		updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
+	# 	cost = -T.mean(self.cross_entropy_loss(x,y))
+	# 	params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
+	# 	grads = T.grad(cost,params)
+	# 	updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
 
-		train_model = theano.function(
-			inputs = [x,y],
-			outputs = cost,
-			updates = updates
-		)
+	# 	train_model = theano.function(
+	# 		inputs = [x,y],
+	# 		outputs = cost,
+	# 		updates = updates
+	# 	)
 
-		train_x_val = train_x.get_value()
-		train_y_val = train_y.get_value()
-		print("function compiled\n\n")
-		for j in xrange(n_epochs):
-			sum_epoch = 0 
-			t1 = time.time()
-			for i in xrange(n_train_batches):	
-				sum_mini_batch = 0 
-				t3 = time.time()
-				x_slice = train_x_val[i*mini_batch_size: (i+1)*mini_batch_size]
-				y_slice = train_y_val[i*mini_batch_size: (i+1)*mini_batch_size]
-				xy_size = x_slice.shape[0]
-				t4 = time.time()
-				for h in xrange(xy_size):
-					sum_mini_batch += train_model(x_slice[h], y_slice[h])
-				# print("Time making sum {}".format(time.time()-t4))
-				if i % 30 == 0:
-					print("Sum for minibatch number {} out of {}: {}".format(i,n_train_batches,sum_mini_batch))
-				sum_epoch += sum_mini_batch
-			print("Sum for this epoch: {:.3f}, took {:.3f} sec".format(sum_epoch, time.time()-t1))
-			if j % 5 == 0:
-				t2 = time.time()
-				self.save_param("param_epoch{}.dat".format(i))
-				print("Pickling epoch number {} took {:.3f} sec".format(j, time.time()-t2))
+	# 	train_x_val = train_x.get_value()
+	# 	train_y_val = train_y.get_value()
+	# 	print("function compiled\n\n")
+	# 	for j in xrange(n_epochs):
+	# 		sum_epoch = 0 
+	# 		t1 = time.time()
+	# 		for i in xrange(n_train_batches):	
+	# 			sum_mini_batch = 0 
+	# 			t3 = time.time()
+	# 			x_slice = train_x_val[i*mini_batch_size: (i+1)*mini_batch_size]
+	# 			y_slice = train_y_val[i*mini_batch_size: (i+1)*mini_batch_size]
+	# 			xy_size = x_slice.shape[0]
+				
+	# 			for h in xrange(xy_size):
+	# 				sum_mini_batch += train_model(x_slice[h], y_slice[h])
+	# 			print("Time for minibatch: {}".format(time.time()-t3))
+	# 			# print("Time making sum {}".format(time.time()-t4))
+	# 			if i % 30 == 0:
+	# 				print("Sum for minibatch number {} out of {}: {}".format(i,n_train_batches,sum_mini_batch))
+	# 			sum_epoch += sum_mini_batch
+	# 		print("Sum for this epoch: {:.3f}, took {:.3f} sec".format(sum_epoch, time.time()-t1))
+	# 		if j % 5 == 0:
+	# 			t2 = time.time()
+	# 			self.save_param("param_epoch{}.dat".format(i))
+	# 			print("Pickling epoch number {} took {:.3f} sec".format(j, time.time()-t2))
 
 
 	def train_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
@@ -201,40 +201,43 @@ class RNNClass(object):
 		"""
 		print("Using train function with indices")
 		train_x, train_y = training_data
-		# cast_y = T.cast(train_y,'int32')
 		train_size_total = train_x.get_value(borrow=True).shape[0]
 
 		n_train_batches = train_size_total/mini_batch_size
 
-		x = T.matrix('x')
-		y = T.matrix('y')
-		# xs = T.tensor3('xs')
-		# ys = T.itensor3('ys')
+		# x = T.matrix('x')
+		# y = T.matrix('y')
+		xs = T.tensor3('xs')
+		ys = T.tensor3('ys')
 
 		index = T.iscalar()
 
-		cost = self.cross_entropy_loss(x,y)
+		# cost = self.cross_entropy_loss(x,y)
+		results, _ = theano.scan(lambda xi, yi: self.cross_entropy_loss(xi,yi),
+									sequences = [xs,ys])
+		loss_fn = -T.mean(results) # loss must be a scalar value, not a matrix
 		params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
-		grads = T.grad(cost,params)
+		grads = T.grad(loss_fn,params)
 		updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
 	
-		train_model_index = theano.function(
+		train_model = theano.function(
 			inputs = [index],
-			outputs = cost,
+			outputs = loss_fn,
 			updates = updates,
 			givens = {
-				x: train_x[index*mini_batch_size: (index+1)*mini_batch_size],
-				y: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
+				xs: train_x[index*mini_batch_size: (index+1)*mini_batch_size],
+				ys: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
 			}
 		)
 		print("Function compiled\n\n")
 		for i in xrange(n_epochs):
 			t1 = time.time()
 			for index in xrange(n_train_batches):
+				t2 = time.time()
 				train_model(index)
-				# print("Minibatch done")
+				print("Minibatch done, took {:.3f}".format(time.time()-t2))
 			print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
-			if i % 5 == 0:
+			if i % 2 == 0:
 				t2 = time.time()
 				self.save_param("param_epoch{}.dat".format(i))
 				print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
