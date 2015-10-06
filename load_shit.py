@@ -30,12 +30,12 @@ def load_shit():
 	ny = nx 
 
 	trainer = RNN(nh,nx,ny)
-	trainer.load_param('param_epoch195.dat')
+	trainer.load_param('param_epoch35.dat')
 
 	f = trainer.compile_gen_sentence()
 
-	for x in x[100:150]:
-		y_guess = f(x)
+	for xi in x[100:150]:
+		y_guess = f(xi[0])
 		y_argmax = [np.argmax(y) for y in y_guess] 
 		char_y = [unique_char[int(yi)] for yi in y_argmax]
 		print(char_y)
