@@ -19,7 +19,7 @@ except:
 	import pickle
 import multiprocessing
 
-class RNN(object):
+class RNNClass(object):
 
 	def __init__(self, nh, nx, ny):
 		"""
@@ -111,7 +111,6 @@ class RNN(object):
 
 		return T.sum((y-y_guess)**2)
 
-	def 
 
 	def save_param(self,pickle_file):
 
@@ -129,10 +128,9 @@ class RNN(object):
 
 		self.wx, self.wh, self.wy, self.bh, self.by, self.h0 = param
 
-	def train(self,training_data,learning_rate,n_epochs,mini_batch_size):
+	def train_no_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
 		"""
-		Using a squared difference loss function now. I couldn't get 
-		log loss function to work out for me. Dont know how that works.
+		Right now using cross entropy loss function. This works, albeit very slowly.
 		args:
 			- training_data: inputs with ideal outputs
 			- learning_rate
@@ -141,31 +139,19 @@ class RNN(object):
 
 		"""
 		train_x, train_y = training_data
-		cast_y = T.cast(train_y,'int32')
+		# cast_y = T.cast(train_y,'int32')
 		train_size_total = train_x.get_value(borrow=True).shape[0]
 
 		n_train_batches = train_size_total/mini_batch_size
 
 		x = T.matrix('x')
-		y = T.imatrix('y')
-		xs = T.tensor3('xs')
-		ys = T.itensor3('ys')
+		y = T.matrix('y')
+		# xs = T.tensor3('xs')
+		# ys = T.itensor3('ys')
 
-		index = T.iscalar()
+		# index = T.iscalar()
 
-		[h, s], _ = theano.scan(fn=self.feed_through,
-						sequences=x,
-						outputs_info=[self.h0,None])
-
-		y_guess = s[:,0,:]
-		loss = T.sum((y-y_guess)**2)
-		# total, _ = theano.scan(fn=loss,
-		# 					sequences=y)
-
-		# loss = T.sum(T.sum((y-y_guess)**2,axis=1),axis=1)
-		# train_model1 =  theano.function([x,y],loss)#,mode='DebugMode')
-
-		cost = self.sqr_diff_loss(x,y)
+		cost = self.cross_entropy_loss(x,y)
 		params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
 		grads = T.grad(cost,params)
 		updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
@@ -174,20 +160,11 @@ class RNN(object):
 			inputs = [x,y],
 			outputs = cost,
 			updates = updates
-			# givens = {
-			# 	x: train_x[index*mini_batch_size: (index+1)*mini_batch_size],
-			# 	y: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
-			# }
 		)
-		# for i in xrange(n_epochs):
-		# 	t1 = time.time()
-		# 	for index in xrange(n_train_batches):
-		# 		train_model(index)
-		# 		# print("Minibatch done")
-		# 	print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
+
 		train_x_val = train_x.get_value()
-		cast_y_val = cast_y.eval()
-		print("function compiled\n\n\n")
+		train_y_val = train_y.get_value()
+		print("function compiled\n\n")
 		for j in xrange(n_epochs):
 			sum_epoch = 0 
 			t1 = time.time()
@@ -195,8 +172,7 @@ class RNN(object):
 				sum_mini_batch = 0 
 				t3 = time.time()
 				x_slice = train_x_val[i*mini_batch_size: (i+1)*mini_batch_size]
-				y_slice = cast_y_val[i*mini_batch_size: (i+1)*mini_batch_size]
-				# print("Time making slice {}".format(time.time()-t3))
+				y_slice = train_y_val[i*mini_batch_size: (i+1)*mini_batch_size]
 				xy_size = x_slice.shape[0]
 				t4 = time.time()
 				for h in xrange(xy_size):
@@ -211,27 +187,57 @@ class RNN(object):
 				self.save_param("param_epoch{}.dat".format(i))
 				print("Pickling epoch number {} took {:.3f} sec".format(j, time.time()-t2))
 
-		# train_model = theano.function(
-		# 	inputs = [index],
-		# 	outputs = cost,
-		# 	updates = updates,
-		# 	givens = {
-		# 		x: train_x[index*mini_batch_size: (index+1)*mini_batch_size],
-		# 		y: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
-		# 	}
-		# )
-		# print("Function compiled")
-		# for i in xrange(n_epochs):
-		# 	t1 = time.time()
-		# 	for index in xrange(n_train_batches):
-		# 		train_model(index)
-		# 		# print("Minibatch done")
-		# 	print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
-		# 	if i % 5 == 0:
-		# 		t2 = time.time()
-		# 		self.save_param("param_epoch{}.dat".format(i))
-		# 		print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
 
+	def train_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
+		"""
+		Using a squared difference loss function now. I couldn't get 
+		log loss function to work out for me. Dont know how that works.
+		args:
+			- training_data: inputs with ideal outputs
+			- learning_rate
+			- n_epochs: the number of epochs to train the NN for 
+			- mini_batch_size: the size of the mini batch to be used for SGD 
+
+		"""
+		print("Using train function with indices")
+		train_x, train_y = training_data
+		# cast_y = T.cast(train_y,'int32')
+		train_size_total = train_x.get_value(borrow=True).shape[0]
+
+		n_train_batches = train_size_total/mini_batch_size
+
+		x = T.matrix('x')
+		y = T.matrix('y')
+		# xs = T.tensor3('xs')
+		# ys = T.itensor3('ys')
+
+		index = T.iscalar()
+
+		cost = self.cross_entropy_loss(x,y)
+		params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
+		grads = T.grad(cost,params)
+		updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
+	
+		train_model_index = theano.function(
+			inputs = [index],
+			outputs = cost,
+			updates = updates,
+			givens = {
+				x: train_x[index*mini_batch_size: (index+1)*mini_batch_size],
+				y: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
+			}
+		)
+		print("Function compiled\n\n")
+		for i in xrange(n_epochs):
+			t1 = time.time()
+			for index in xrange(n_train_batches):
+				train_model(index)
+				# print("Minibatch done")
+			print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
+			if i % 5 == 0:
+				t2 = time.time()
+				self.save_param("param_epoch{}.dat".format(i))
+				print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
 
 	def gen_random_sentence(self,x_init):
 		"""
@@ -276,7 +282,7 @@ if __name__ == '__main__':
 	nx = len(char_map_obj.unique_char)
 	ny = nx 
 
-	trainer = RNN(nh,nx,ny)
+	trainer = RNNClass(nh,nx,ny)
 	# jobs = []
 	# for i in xrange(2):
 	# 	p = multiprocessing.Process(target=trainer.train, args=((shared_x,shared_y),0.03,1000,10,))
