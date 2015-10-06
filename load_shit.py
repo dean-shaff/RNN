@@ -1,5 +1,5 @@
 from character_mapping import Character_Map 
-from RNN import RNN 
+from RNN import RNNClass 
 import numpy as np 
 
 def train_NN(mu, n_epoch, mini_batch):
@@ -10,13 +10,13 @@ def train_NN(mu, n_epoch, mini_batch):
 	char_map_obj = Character_Map(text_test,'mapping.dat',overwrite=True, break_line=None)
 	char_map_obj.k_map()
 	x, y, shared_x, shared_y = char_map_obj.gen_x_and_y(filename=None)
-	# print(shared_x, shared_y.get_value().shape[0])
+
 	nh = 100
 	nx = len(char_map_obj.unique_char)
 	ny = nx 
 
-	trainer = RNN(nh,nx,ny)
-	trainer.train((shared_x,shared_y),mu,n_epoch,mini_batch)
+	trainer = RNNClass(nh,nx,ny)
+	trainer.train_index((shared_x,shared_y),mu,n_epoch,mini_batch)
 
 def load_shit():
 	text_test = './../texts/melville.txt'
@@ -45,8 +45,8 @@ def load_shit():
 	return trainer, char_map_obj, x, y, shared_x, shared_y
 
 if __name__ == '__main__':
-	# train_NN(0.1,200,500) #change the learning rate
-	load_shit()
+	train_NN(mu=0.001,n_epoch=200,mini_batch=1000) #change the learning rate
+	# load_shit()
 
 
 

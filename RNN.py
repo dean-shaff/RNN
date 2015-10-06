@@ -17,7 +17,8 @@ try:
 	import cPickle as pickle
 except:
 	import pickle
-import multiprocessing
+import os 
+from datetime import datetime
 
 class RNNClass(object):
 
@@ -199,7 +200,13 @@ class RNNClass(object):
 			- mini_batch_size: the size of the mini batch to be used for SGD 
 
 		"""
-		print("Using train function with indices")
+		foo = datetime.now()
+		param_folder = "param_{}-{}_{}:{}/".format(foo.day, foo.month, foo.hour, foo.minute)
+		os.mkdir(param_folder)
+		print("Saving initial parameters")
+		self.save_param("{}param_epoch{}.dat".format(param_folder,0))
+		
+		# print("Using train function with indices")
 		train_x, train_y = training_data
 		train_size_total = train_x.get_value(borrow=True).shape[0]
 
@@ -229,18 +236,20 @@ class RNNClass(object):
 				ys: train_y[index*mini_batch_size: (index+1)*mini_batch_size] 
 			}
 		)
-		print("Function compiled\n\n")
+		print("Function compiled!")
+		print("Training model")
 		for i in xrange(n_epochs):
 			t1 = time.time()
 			for index in xrange(n_train_batches):
 				t2 = time.time()
 				train_model(index)
-				print("Minibatch done, took {:.3f}".format(time.time()-t2))
+				if index % 30 == 0:
+					print("{} out of {} minibatches done, took ~ {:.3f}".format(index,n_train_batches,30*(time.time()-t2)))
 			print("Epoch number {}, took {:.3f} sec".format(i,time.time()-t1))
-			if i % 2 == 0:
-				t2 = time.time()
-				self.save_param("param_epoch{}.dat".format(i))
-				print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
+			# if i % 2 == 0:
+			t2 = time.time()
+			self.save_param("{}param_epoch{}.dat".format(param_folder,i))
+			print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
 
 	def gen_random_sentence(self,x_init):
 		"""
@@ -292,7 +301,10 @@ if __name__ == '__main__':
 	# 	jobs.append(p)
 	# 	p.start()
 	# trainer.load_param('param_epoch95.dat')
-	trainer.train((shared_x,shared_y),0.01,100,100)
+	trainer.train_index(training_data=(shared_x,shared_y),
+						learning_rate=0.01,
+						n_epochs=100,
+						mini_batch_size=1000)
 	# f = trainer.compile_gen_sentence()
 
 
