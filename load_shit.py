@@ -30,7 +30,7 @@ def load_shit():
 	ny = nx 
 
 	trainer = RNN(nh,nx,ny)
-	trainer.load_param('param_epoch35.dat')
+	trainer.load_param('param_6-10_17:52/param_epoch199.dat')
 
 	f = trainer.compile_gen_sentence()
 
@@ -45,8 +45,8 @@ def load_shit():
 	return trainer, char_map_obj, x, y, shared_x, shared_y
 
 if __name__ == '__main__':
-	train_NN(mu=0.001,n_epoch=200,mini_batch=1000) #change the learning rate
-	# load_shit()
+	# train_NN(mu=0.001,n_epoch=200,mini_batch=1000) #change the learning rate
+	load_shit()
 
 
 

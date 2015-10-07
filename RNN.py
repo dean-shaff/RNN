@@ -1,12 +1,6 @@
 """
 My first implemenation of recursive neural net (RNN) 
-with LSTM architecture for character analysis
-
-
-To do 02/09/2015 
-	 - get scan function working 
-	 - convert x and y to theano shared variables to do fast math 
-
+with (hopefully) LSTM architecture for character analysis
 """
 import theano 
 import theano.tensor as T 
@@ -74,20 +68,20 @@ class RNNClass(object):
 
 		return h, y_guess
 	
-	def loss(self,x,y):
-		"""
-		args:
-			- x is a vector containing the first character of a sequence 
-			- y is a vector containing the last character of the sequence 
+	# def loss(self,x,y):
+	# 	"""
+	# 	args:
+	# 		- x is a vector containing the first character of a sequence 
+	# 		- y is a vector containing the last character of the sequence 
 			
-		***assuming constance sequence length****
-		"""
+	# 	***assuming constance sequence length****
+	# 	"""
 
-		[h, s], _ = theano.scan(fn=self.feed_through,
-						sequences=x,
-						outputs_info=[self.h0,None])
+	# 	[h, s], _ = theano.scan(fn=self.feed_through,
+	# 					sequences=x,
+	# 					outputs_info=[self.h0,None])
 		
-		return -T.mean(T.log(s)[T.arange(y.shape[0]), y])
+	# 	return -T.mean(T.log(s)[T.arange(y.shape[0]), y])
 
 	def cross_entropy_loss(self, x, y):
 		"""
@@ -251,35 +245,63 @@ class RNNClass(object):
 			self.save_param("{}param_epoch{}.dat".format(param_folder,i))
 			print("Pickling epoch number {} took {:.3f} sec".format(i, time.time()-t2))
 
-	def gen_random_sentence(self,x_init):
+
+	def sequence_guess(self,x_init,sequence_length):
 		"""
-		Run 'x_init' through the RNN, saving the y values at 
-		each 'time step'.
+		Given some x_init vector, this will generate a sequence of 
+		characters, 'sequence_length' long. 
+		runs x_init through the RNN
+		returns a vector containing the generated sequence 
 		"""
-		ys = []
-		y, h = self.feed_through(x_init,self.h0)
-		ys.append(y)
-		for i in xrange(1,self.sequence_length):
-			y, h = self.feed_through(y,h)
-			ys.append(y)
+		x0 = T.vector('x0')
+		h0 = T.vector('h0')
+		h, y_intermediate = self.feed_through(x0, h0)
 
-		# ys = [y.eval() for y in ys]
-		# ys_arg_max = [np.argmax(y) for y in ys]
+		f1 = theano.function(inputs=[x0,h0],
+								outputs=[h, y_intermediate])
 
-		return ys
+		f2 = theano.function([x0],T.argmax(x0))
+
+		hi, yi = f1(x_init, self.h0.get_value())
+		# ys = [y[0]]
+		y_argmax = [f2(yi[0])]
+
+		for i in xrange(1, sequence_length):
+				hi, yi = f1(yi[0],hi)
+				# ys.append(yi[0])
+				y_argmax.append(f2(yi[0]))
+
+		return y_argmax
+
+	# def gen_random_sentence(self,x_init):
+	# 	"""
+	# 	Run 'x_init' through the RNN, saving the y values at 
+	# 	each 'time step'.
+	# 	"""
+	# 	ys = []
+	# 	y, h = self.feed_through(x_init,self.h0)
+	# 	ys.append(y)
+	# 	for i in xrange(1,self.sequence_length):
+	# 		y, h = self.feed_through(y,h)
+	# 		ys.append(y)
+
+	# 	# ys = [y.eval() for y in ys]
+	# 	# ys_arg_max = [np.argmax(y) for y in ys]
+
+	# 	return ys
 
 
-	def compile_gen_sentence(self):
-		"""
-		compile a theano function that takes the initial x value 
-		and returns y vectors for each of the subsequent positions. 
-		"""
-		x = T.dvector('x')
-		y = self.gen_random_sentence(x)
+	# def compile_gen_sentence(self):
+	# 	"""
+	# 	compile a theano function that takes the initial x value 
+	# 	and returns y vectors for each of the subsequent positions. 
+	# 	"""
+	# 	x = T.vector('x')
+	# 	y = self.gen_random_sentence(x)
 
-		f = theano.function([x],y)
+	# 	f = theano.function([x],y)
 
-		return f 
+	# 	return f 
 
 
 

@@ -6,3 +6,4 @@ RNN_messing.ipynb
 RNN_simple.py
 .ipynb_checkpoints/
 param*/
+gpu_test.py
