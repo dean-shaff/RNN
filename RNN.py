@@ -62,6 +62,7 @@ class RNNClass(object):
 
 		self.sequence_length = 15
 
+
 	def feed_through(self,x,h_tm1):
 		"""
 		t_step is the current time step. If t_step == 0, then we use self.h0

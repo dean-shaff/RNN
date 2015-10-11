@@ -33,10 +33,12 @@ class RNN_multilayer(object):
 			- nx is the size of the input vector 
 			- ny is the size of the output vector (ny = nx in character example)
 		"""
+		self.nh_vector = nh_vector
 		wx_n = [] #W_{x h^n} matrix 
 		whh_n = [] #W_{h^n h^n} matrix
 		whm1h_n = [] #W_{h^{n-1} h^n} matrix 
 		bh_n = [] 
+		h0_n = [] 
 		for i in xrange(len(nh_vector)):
 			wx_n.append(theano.shared(name='wx',
 						value=0.2 * np.random.uniform(-1.0, 1.0,(nx, nh_vector[i])).astype(theano.config.floatX))) #input weights
@@ -46,6 +48,10 @@ class RNN_multilayer(object):
 
 			bh_n.append(theano.shared(name='bh',
 						value=np.zeros(nh_vector[i], dtype=theano.config.floatX)))
+
+			h0_n.append(theano.shared(name='h0',
+								value=np.zeros(nh_vector[i],dtype=theano.config.floatX)))
+
 			if i == 0:
 				continue
 			else: 
@@ -57,7 +63,7 @@ class RNN_multilayer(object):
 		self.whh_n = whh_n
 		self.whm1h_n = whm1h_n
 		self.bh_n = bh_n
-
+		self.h0_n = h0_n 
 
 		self.wy = theano.shared(name='wy',
 							   value=0.2 * np.random.uniform(-1.0, 1.0,
@@ -68,49 +74,7 @@ class RNN_multilayer(object):
 							   value=np.zeros(ny,
 							   dtype=theano.config.floatX)) #output layer bias
 		
-		self.h0 = theano.shared(name='h0',
-								value=np.zeros(nh_vector[0],
-								dtype=theano.config.floatX)) #initial h vector 
-
 		self.sequence_length = sequence_length
-
-	def feed_through(self,x,h_tm1):
-		"""
-		t_step is the current time step. If t_step == 0, then we use self.h0
-		to feed through net.
-		basically copied from the theano tutorial
-		"""
-		h = T.tanh(T.dot(x,self.wx) + T.dot(h_tm1, self.wh) + self.bh)
-
-		y_hat = self.by + T.dot(h,self.wy)
-
-		y_guess = T.nnet.softmax(y_hat) 
-
-		return h, y_guess
-
-	def cross_entropy_loss(self, x, y):
-		"""
-		Cross entropy loss function. Average of cross entropy across a minibatch 
-		"""
-
-		[h, s], _ = theano.scan(fn=self.feed_through,
-						sequences=x,
-						outputs_info=[self.h0,None]) 
-
-		y_guess = s[:,0,:]
-
-		return y*T.log(y_guess) + (1.0-y)*T.log(1.0-y_guess)
-
-	def sqr_diff_loss(self, x, y):
-
-		[h, s], _ = theano.scan(fn=self.feed_through,
-						sequences=x,
-						outputs_info=[self.h0,None])
-
-		y_guess = s[:,0,:]
-
-		return T.sum((y-y_guess)**2)
-
 
 	def save_param(self,pickle_file):
 
@@ -127,6 +91,76 @@ class RNN_multilayer(object):
 		param = pickle_me['param']
 
 		self.wx, self.wh, self.wy, self.bh, self.by, self.h0 = param
+
+
+	def feed_through_1(self,x,h_tm1):
+		"""
+		this is for n = 0 (the first layer)
+		"""
+		ht = T.tanh(T.dot(x,self.wx_n[0]) + T.dot(h_tm1, self.whh_n[0]) + self.bh_n[0])
+
+		# y_hat = self.by + T.dot(h,self.wy) 
+
+		# y_guess = T.nnet.softmax(y_hat) 
+
+		return ht
+
+	def feed_through_n(self, x, h_nm1, h_tm1, n_step):
+		"""
+		feed through the RNN , n>0
+		"""
+		# if n_step == 0:
+		# 	hnt = T.tanh(T.dot(x,self.wx_n[0]) + 
+		# 		T.dot(h_tm1, self.whh_n[0]) + 
+		# 		self.bh_n[0])
+
+		# elif n_step > 0:
+		hnt = T.tanh(T.dot(x,self.wx_n[n_step]) + 
+					T.dot(h_nm1, self.whm1h_n[n_step-1]) + 
+					T.dot(h_tm1, self.whh_n[n_step]) +
+					self.bh_n[n_step])
+
+		return hnt
+
+	def cross_entropy_loss(self, x):#, y):
+		"""
+		Cross entropy loss function. Average of cross entropy across a minibatch 
+		"""
+		# write it with a for loop first. 
+		# h = []
+		# for n in xrange(len(self.nh_vector)):
+		# 	hs = [self.h0_n[n]] 
+		# 	for t in xrange(1,self.sequence_length):
+		# 		if n == 0:
+		# 			hs.append(self.feed_through_1(x[t],hs[t-1]))
+		# 		else:
+		# 			hs.append(self.feed_through_n(x[t],hs[t-1],h[n-1][t],n))
+		# 	h.append(hs)
+
+
+
+		# h_final = h[-1]
+		# return h_final
+		h_init, _ = theano.scan(fn=self.feed_through_1,
+						sequences=x,
+						outputs_info=self.h0_n[0]) 
+
+		return h_init
+
+		# h_next, _ = 
+
+
+
+		# for i in xrange(1,len(self.nh_vector)):
+		# 	h, _ = theano.scan(fn = self.feed_through_n,
+		# 						sequences = [x, h],
+		# 						outputs_info=[self.h0_n[i],i,None])
+
+		# h_final = h[:,0,:]
+
+		# y_guess = T.nnet.softmax(self.by + T.dot(h,self.wy))
+
+		# return y*T.log(y_guess) + (1.0-y)*T.log(1.0-y_guess)
 
 
 	def train_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
