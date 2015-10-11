@@ -22,45 +22,57 @@ except:
 import os 
 from datetime import datetime
 
-class RNNClass(object):
+class RNN_multilayer(object):
 
-	def __init__(self, nh, nx, ny):
+	def __init__(self, nh_vector, nx, ny, sequence_length=15):
 		"""
-		This is only set up for a single hidden layer 
+		Setting this up for multiple layers
 		args:
-			nh is size of hidden layer vector 
-			nx is the size of the input vector 
-			ny is the size of the output vector (ny = nx in character example)
+			- nh_vector is a list or tuple containing 
+				the dimensions of the hidden layers 
+			- nx is the size of the input vector 
+			- ny is the size of the output vector (ny = nx in character example)
 		"""
+		wx_n = [] #W_{x h^n} matrix 
+		whh_n = [] #W_{h^n h^n} matrix
+		whm1h_n = [] #W_{h^{n-1} h^n} matrix 
+		bh_n = [] 
+		for i in xrange(len(nh_vector)):
+			wx_n.append(theano.shared(name='wx',
+						value=0.2 * np.random.uniform(-1.0, 1.0,(nx, nh_vector[i])).astype(theano.config.floatX))) #input weights
+			
+			whh_n.append(theano.shared(name='wh',
+						value=0.2 * np.random.uniform(-1.0, 1.0,(nh_vector[i], nh_vector[i])).astype(theano.config.floatX)))
 
-		self.wx = theano.shared(name='wx',
-								value=0.2 * np.random.uniform(-1.0, 1.0,
-								(nx, nh))
-								.astype(theano.config.floatX)) #input weights
+			bh_n.append(theano.shared(name='bh',
+						value=np.zeros(nh_vector[i], dtype=theano.config.floatX)))
+			if i == 0:
+				continue
+			else: 
+				#my understanding is that whm1_n should have one less dimension than the whh_n list
+				whm1h_n.append(theano.shared(name='wh',
+							value=0.2 * np.random.uniform(-1.0, 1.0,(nh_vector[i-1], nh_vector[i])).astype(theano.config.floatX)))
 
-		self.wh = theano.shared(name='wh',
-								value=0.2 * np.random.uniform(-1.0, 1.0,
-								(nh, nh))
-								.astype(theano.config.floatX)) #hidden layer weights
+		self.wx_n = wx_n 
+		self.whh_n = whh_n
+		self.whm1h_n = whm1h_n
+		self.bh_n = bh_n
+
 
 		self.wy = theano.shared(name='wy',
 							   value=0.2 * np.random.uniform(-1.0, 1.0,
-							   (nh, ny))
+							   (nh_vector[-1], ny))
 							   .astype(theano.config.floatX)) #output weights
-		
-		self.bh = theano.shared(name='bh',
-								value=np.zeros(nh,
-								dtype=theano.config.floatX)) #hidden layer bias
 		
 		self.by = theano.shared(name='b',
 							   value=np.zeros(ny,
 							   dtype=theano.config.floatX)) #output layer bias
 		
 		self.h0 = theano.shared(name='h0',
-								value=np.zeros(nh,
+								value=np.zeros(nh_vector[0],
 								dtype=theano.config.floatX)) #initial h vector 
 
-		self.sequence_length = 15
+		self.sequence_length = sequence_length
 
 	def feed_through(self,x,h_tm1):
 		"""
@@ -75,21 +87,6 @@ class RNNClass(object):
 		y_guess = T.nnet.softmax(y_hat) 
 
 		return h, y_guess
-	
-	# def loss(self,x,y):
-	# 	"""
-	# 	args:
-	# 		- x is a vector containing the first character of a sequence 
-	# 		- y is a vector containing the last character of the sequence 
-			
-	# 	***assuming constance sequence length****
-	# 	"""
-
-	# 	[h, s], _ = theano.scan(fn=self.feed_through,
-	# 					sequences=x,
-	# 					outputs_info=[self.h0,None])
-		
-	# 	return -T.mean(T.log(s)[T.arange(y.shape[0]), y])
 
 	def cross_entropy_loss(self, x, y):
 		"""
@@ -130,65 +127,6 @@ class RNNClass(object):
 		param = pickle_me['param']
 
 		self.wx, self.wh, self.wy, self.bh, self.by, self.h0 = param
-
-	# def train_no_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
-	# 	"""
-	# 	Right now using cross entropy loss function. This works, albeit very slowly.
-	# 	args:
-	# 		- training_data: inputs with ideal outputs
-	# 		- learning_rate
-	# 		- n_epochs: the number of epochs to train the NN for 
-	# 		- mini_batch_size: the size of the mini batch to be used for SGD 
-
-	# 	"""
-	# 	train_x, train_y = training_data
-	# 	train_size_total = train_x.get_value(borrow=True).shape[0]
-
-	# 	n_train_batches = train_size_total/mini_batch_size
-
-	# 	x = T.matrix('x')
-	# 	y = T.matrix('y')
-	# 	xs = T.tensor3('xs')
-	# 	ys = T.itensor3('ys')
-
-	# 	# index = T.iscalar()
-
-	# 	cost = -T.mean(self.cross_entropy_loss(x,y))
-	# 	params = [self.wx, self.wh, self.wy, self.bh, self.by, self.h0]
-	# 	grads = T.grad(cost,params)
-	# 	updates = [(param, param-learning_rate*grad) for param, grad in zip(params,grads)]
-
-	# 	train_model = theano.function(
-	# 		inputs = [x,y],
-	# 		outputs = cost,
-	# 		updates = updates
-	# 	)
-
-	# 	train_x_val = train_x.get_value()
-	# 	train_y_val = train_y.get_value()
-	# 	print("function compiled\n\n")
-	# 	for j in xrange(n_epochs):
-	# 		sum_epoch = 0 
-	# 		t1 = time.time()
-	# 		for i in xrange(n_train_batches):	
-	# 			sum_mini_batch = 0 
-	# 			t3 = time.time()
-	# 			x_slice = train_x_val[i*mini_batch_size: (i+1)*mini_batch_size]
-	# 			y_slice = train_y_val[i*mini_batch_size: (i+1)*mini_batch_size]
-	# 			xy_size = x_slice.shape[0]
-				
-	# 			for h in xrange(xy_size):
-	# 				sum_mini_batch += train_model(x_slice[h], y_slice[h])
-	# 			print("Time for minibatch: {}".format(time.time()-t3))
-	# 			# print("Time making sum {}".format(time.time()-t4))
-	# 			if i % 30 == 0:
-	# 				print("Sum for minibatch number {} out of {}: {}".format(i,n_train_batches,sum_mini_batch))
-	# 			sum_epoch += sum_mini_batch
-	# 		print("Sum for this epoch: {:.3f}, took {:.3f} sec".format(sum_epoch, time.time()-t1))
-	# 		if j % 5 == 0:
-	# 			t2 = time.time()
-	# 			self.save_param("param_epoch{}.dat".format(i))
-	# 			print("Pickling epoch number {} took {:.3f} sec".format(j, time.time()-t2))
 
 
 	def train_index(self,training_data,learning_rate,n_epochs,mini_batch_size):
@@ -280,36 +218,6 @@ class RNNClass(object):
 				y_argmax.append(f2(yi[0]))
 
 		return y_argmax
-
-	# def gen_random_sentence(self,x_init):
-	# 	"""
-	# 	Run 'x_init' through the RNN, saving the y values at 
-	# 	each 'time step'.
-	# 	"""
-	# 	ys = []
-	# 	y, h = self.feed_through(x_init,self.h0)
-	# 	ys.append(y)
-	# 	for i in xrange(1,self.sequence_length):
-	# 		y, h = self.feed_through(y,h)
-	# 		ys.append(y)
-
-	# 	# ys = [y.eval() for y in ys]
-	# 	# ys_arg_max = [np.argmax(y) for y in ys]
-
-	# 	return ys
-
-
-	# def compile_gen_sentence(self):
-	# 	"""
-	# 	compile a theano function that takes the initial x value 
-	# 	and returns y vectors for each of the subsequent positions. 
-	# 	"""
-	# 	x = T.vector('x')
-	# 	y = self.gen_random_sentence(x)
-
-	# 	f = theano.function([x],y)
-
-	# 	return f 
 
 
 
